@@ -160,6 +160,9 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
             </div>
           </div>
         ))}
+        {transactions?.length >= 4 && (
+          <div className="h-24 invisible" />
+        )}
       </div>
 
       {/* Edit Dialog */}

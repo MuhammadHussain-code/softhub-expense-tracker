@@ -109,8 +109,8 @@ export function TransactionForm({
           id="description"
           placeholder={
             currentType === 'work'
-              ? 'e.g., Screen repair for iPhone 13'
-              : 'e.g., Purchased display parts'
+              ? 'e.g., Payment received for app development work'
+              : 'e.g., Payment for internet bill'
           }
           rows={3}
           {...register('description')}
