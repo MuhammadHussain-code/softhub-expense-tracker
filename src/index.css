@@ -107,9 +107,17 @@
   }
   html {
     transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    height: 100%;
+    overflow: hidden;
   }
   body {
     @apply bg-background text-foreground antialiased;
+    height: 100%;
+    overflow: hidden;
+  }
+  #root {
+    height: 100%;
+    overflow: hidden;
   }
   /* Improved focus styles for accessibility */
   *:focus-visible {
