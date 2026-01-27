@@ -35,6 +35,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
   const deleteMutation = useDeleteTransaction()
   const [editingTransaction, setEditingTransaction] = useState<LocalTransaction | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const handleDelete = async () => {
     if (!deletingId) return
@@ -75,9 +76,10 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
         {transactions.map((t) => (
           <div
             key={t.id}
-            className="flex items-center justify-between rounded-lg border bg-card p-4 transition-colors hover:bg-accent/50"
+            className="flex items-center justify-between rounded-lg border bg-card p-4 transition-colors hover:bg-accent/50 cursor-pointer"
+            onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
           >
-            <div className="flex items-start gap-3">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
               <div
                 className={cn(
                   'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
@@ -93,7 +95,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">
+                <p className={cn('font-medium', expandedId !== t.id && 'truncate')}>
                   {t.description || (t.type === 'work' ? 'Work' : 'Expense')}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -102,7 +104,7 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {/* Sync Status Indicator */}
               {t.syncStatus && t.syncStatus !== 'synced' && (
                 <div
@@ -138,7 +140,12 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <MoreHorizontal className="h-4 w-4" />
                     <span className="sr-only">Open menu</span>
                   </Button>
