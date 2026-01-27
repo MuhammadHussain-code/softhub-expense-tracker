@@ -36,8 +36,8 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: 'SubHub Tracker',
-        short_name: 'SubHub',
+        name: 'SoftHub Tracker',
+        short_name: 'SoftHub',
         description: 'Track your store income and expenses with ease',
         theme_color: '#1e3a5f',
         background_color: '#0f172a',

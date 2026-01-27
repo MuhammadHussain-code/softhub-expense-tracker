@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MoreHorizontal, Pencil, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, TrendingUp, TrendingDown, CloudOff, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { useStore } from '@/providers/store-provider'
@@ -23,17 +23,17 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TransactionDialog } from './transaction-dialog'
-import type { Transaction } from '@/types/database'
+import type { LocalTransaction } from '@/lib/offline-db'
 
 interface TransactionListProps {
-  transactions: Transaction[]
+  transactions: LocalTransaction[]
   isLoading: boolean
 }
 
 export function TransactionList({ transactions, isLoading }: TransactionListProps) {
   const { activeStore } = useStore()
   const deleteMutation = useDeleteTransaction()
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [editingTransaction, setEditingTransaction] = useState<LocalTransaction | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const handleDelete = async () => {
@@ -103,6 +103,29 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Sync Status Indicator */}
+              {t.syncStatus && t.syncStatus !== 'synced' && (
+                <div
+                  className={cn(
+                    'flex h-5 w-5 items-center justify-center rounded-full',
+                    t.syncStatus === 'pending'
+                      ? 'bg-warning/10 text-warning'
+                      : 'bg-destructive/10 text-destructive'
+                  )}
+                  title={
+                    t.syncStatus === 'pending'
+                      ? 'Pending sync'
+                      : 'Sync failed'
+                  }
+                >
+                  {t.syncStatus === 'pending' ? (
+                    <CloudOff className="h-3 w-3" />
+                  ) : (
+                    <AlertCircle className="h-3 w-3" />
+                  )}
+                </div>
+              )}
+
               <span
                 className={cn(
                   'text-lg font-semibold',

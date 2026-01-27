@@ -7,6 +7,7 @@ import {
 } from 'react'
 import type { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { clearAllOfflineData } from '@/lib/offline-db'
 
 interface AuthContextType {
   user: User | null
@@ -67,6 +68,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const signOut = async () => {
+    // Clear offline data on signout for security
+    await clearAllOfflineData()
     await supabase.auth.signOut()
   }
 

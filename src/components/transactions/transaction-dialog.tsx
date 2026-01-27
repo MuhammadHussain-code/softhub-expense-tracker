@@ -8,12 +8,12 @@ import {
 } from '@/components/ui/dialog'
 import { TransactionForm, type TransactionFormData } from './transaction-form'
 import { useCreateTransaction, useUpdateTransaction } from '@/hooks/use-transactions'
-import type { Transaction } from '@/types/database'
+import type { LocalTransaction } from '@/lib/offline-db'
 
 interface TransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  transaction?: Transaction
+  transaction?: LocalTransaction
 }
 
 export function TransactionDialog({

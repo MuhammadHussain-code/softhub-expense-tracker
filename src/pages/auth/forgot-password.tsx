@@ -105,7 +105,7 @@ export function ForgotPassword() {
           <div className="mb-4 flex justify-center">
             <img
               src="/full-logo.png"
-              alt="SubHub Tracker"
+              alt="SoftHub Tracker"
               className="h-16 w-auto object-contain"
             />
           </div>

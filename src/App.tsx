@@ -5,6 +5,7 @@ import { QueryProvider } from '@/providers/query-provider'
 import { AuthProvider } from '@/providers/auth-provider'
 import { StoreProvider } from '@/providers/store-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
+import { NetworkProvider } from '@/providers/network-provider'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { AppShell } from '@/components/layout/app-shell'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -79,8 +80,10 @@ export default function App() {
           <QueryProvider>
             <AuthProvider>
               <StoreProvider>
-                <AppRoutes />
-                <Toaster position="bottom-right" richColors closeButton />
+                <NetworkProvider>
+                  <AppRoutes />
+                  <Toaster position="bottom-right" richColors closeButton />
+                </NetworkProvider>
               </StoreProvider>
             </AuthProvider>
           </QueryProvider>

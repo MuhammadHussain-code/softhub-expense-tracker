@@ -81,7 +81,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           <div className="mb-4 flex justify-center">
             <img 
               src={logoSrc} 
-              alt="SubHub Tracker" 
+              alt="SoftHub Tracker" 
               className="h-16 w-auto object-contain"
             />
           </div>

@@ -53,7 +53,7 @@ export function Dashboard() {
       // Only set if current year is in available years, otherwise use first available
       if (availableYears.includes(currentYear)) {
         setYear(currentYear)
-      } else if (availableYears.length > 0) {
+      } else if (availableYears.length > 0 && availableYears[0]) {
         setYear(availableYears[0])
       }
     }
