@@ -20,6 +20,7 @@ interface TransactionFilters {
   month?: string
   year?: string
   date?: string
+  description?: string
 }
 
 interface CreateTransactionData {
@@ -41,28 +42,29 @@ function filterTransactions(
   filters: TransactionFilters
 ): LocalTransaction[] {
   return transactions.filter((t) => {
+    // Date filters
     if (filters.date) {
-      return t.date === filters.date
-    }
-
-    if (filters.month && filters.year) {
+      if (t.date !== filters.date) return false
+    } else if (filters.month && filters.year) {
       const month = filters.month.padStart(2, '0')
       const monthNum = parseInt(filters.month)
       const lastDay = new Date(parseInt(filters.year), monthNum, 0).getDate()
       const startDate = `${filters.year}-${month}-01`
       const endDate = `${filters.year}-${month}-${String(lastDay).padStart(2, '0')}`
-      return t.date >= startDate && t.date <= endDate
-    }
-
-    if (filters.year) {
+      if (t.date < startDate || t.date > endDate) return false
+    } else if (filters.year) {
       const startDate = `${filters.year}-01-01`
       const endDate = `${filters.year}-12-31`
-      return t.date >= startDate && t.date <= endDate
+      if (t.date < startDate || t.date > endDate) return false
+    } else if (filters.month) {
+      const month = filters.month.padStart(2, '0')
+      if (!t.date.includes(`-${month}-`)) return false
     }
 
-    if (filters.month) {
-      const month = filters.month.padStart(2, '0')
-      return t.date.includes(`-${month}-`)
+    // Description filter (case-insensitive substring match)
+    if (filters.description) {
+      const desc = (t.description ?? '').toLowerCase()
+      if (!desc.includes(filters.description.toLowerCase())) return false
     }
 
     return true

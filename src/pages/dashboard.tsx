@@ -11,17 +11,23 @@ import { TransactionFilters } from '@/components/transactions/transaction-filter
 import { TransactionList } from '@/components/transactions/transaction-list'
 import { TransactionDialog } from '@/components/transactions/transaction-dialog'
 import { EmptyState } from '@/components/transactions/empty-state'
+import { useStore } from '@/providers/store-provider'
+import { formatDate } from '@/lib/utils'
 
 export function Dashboard() {
   const [month, setMonth] = useState('')
   const [year, setYear] = useState('')
   const [date, setDate] = useState('')
+  const [description, setDescription] = useState('')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+
+  const { activeStore } = useStore()
 
   const filters = {
     month: month && month !== 'all' ? month : undefined,
     year: year && year !== 'all' ? year : undefined,
     date: date || undefined,
+    description: description.trim() || undefined,
   }
 
   const { data: transactions = [], isLoading } = useTransactions(filters)
@@ -32,6 +38,7 @@ export function Dashboard() {
     setMonth('')
     setYear('')
     setDate('')
+    setDescription('')
   }
 
   // If date filter is set, clear month/year
@@ -64,6 +71,33 @@ export function Dashboard() {
     setDate('')
   }
 
+  const handleExportCsv = () => {
+    if (transactions.length === 0) return
+
+    const currency = activeStore?.currency ?? 'Rs'
+
+    const headers = ['Date', 'Type', 'Description', `Amount (${currency})`]
+    const rows = transactions.map((t) => [
+      `"${formatDate(t.date)}"`,
+      t.type === 'work' ? 'Income' : 'Expense',
+      `"${(t.description ?? '').replace(/"/g, '""')}"`,
+      t.type === 'work' ? t.amount : -t.amount,
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((r) => r.join(',')),
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -94,11 +128,14 @@ export function Dashboard() {
         month={month}
         year={year}
         date={date}
+        description={description}
         availableYears={availableYears}
         onMonthChange={handleMonthChange}
         onYearChange={handleYearChange}
         onDateChange={handleDateChange}
+        onDescriptionChange={setDescription}
         onClear={handleClearFilters}
+        onExportCsv={handleExportCsv}
       />
 
       {/* Transactions List */}

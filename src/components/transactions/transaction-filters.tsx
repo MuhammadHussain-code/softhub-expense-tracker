@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { X, Download } from 'lucide-react'
 import { MONTHS } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,24 +15,30 @@ interface TransactionFiltersProps {
   month: string
   year: string
   date: string
+  description: string
   availableYears: string[]
   onMonthChange: (value: string) => void
   onYearChange: (value: string) => void
   onDateChange: (value: string) => void
+  onDescriptionChange: (value: string) => void
   onClear: () => void
+  onExportCsv: () => void
 }
 
 export function TransactionFilters({
   month,
   year,
   date,
+  description,
   availableYears,
   onMonthChange,
   onYearChange,
   onDateChange,
+  onDescriptionChange,
   onClear,
+  onExportCsv,
 }: TransactionFiltersProps) {
-  const hasFilters = month || year || date
+  const hasFilters = month || year || date || description
 
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -87,17 +93,38 @@ export function TransactionFilters({
         />
       </div>
 
-      {hasFilters && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClear}
-          className="text-muted-foreground"
-        >
-          <X className="mr-1 h-4 w-4" />
-          Clear
+      <div className="w-full space-y-1.5 sm:w-auto">
+        <Label htmlFor="description-filter" className="text-xs">
+          Description
+        </Label>
+        <Input
+          id="description-filter"
+          type="text"
+          placeholder="Search description…"
+          value={description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          className="w-full sm:w-[200px]"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClear}
+            className="text-muted-foreground"
+          >
+            <X className="mr-1 h-4 w-4" />
+            Clear
+          </Button>
+        )}
+
+        <Button variant="outline" size="sm" onClick={onExportCsv}>
+          <Download className="mr-1 h-4 w-4" />
+          Export CSV
         </Button>
-      )}
+      </div>
     </div>
   )
 }
