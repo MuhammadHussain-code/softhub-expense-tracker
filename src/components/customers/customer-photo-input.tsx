@@ -80,11 +80,11 @@ export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputP
         </div>
 
         <div className="flex flex-col gap-2">
+          {/* No `capture` attribute: the OS then offers camera *and* gallery */}
           <input
             ref={inputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             className="sr-only"
             onChange={handleFileChange}
           />

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Eye, EyeOff, Plus } from 'lucide-react'
 import {
   useTransactions,
   useTransactionTotals,
@@ -20,6 +20,8 @@ export function Dashboard() {
   const [date, setDate] = useState('')
   const [description, setDescription] = useState('')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  // Amounts start hidden so a glance over the shoulder shows nothing
+  const [hideAmounts, setHideAmounts] = useState(true)
 
   const { activeStore } = useStore()
 
@@ -108,10 +110,21 @@ export function Dashboard() {
             Track your income and expenses
           </p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="hidden lg:flex">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Entry
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setHideAmounts((hidden) => !hidden)}
+            aria-label={hideAmounts ? 'Show amounts' : 'Hide amounts'}
+            title={hideAmounts ? 'Show amounts' : 'Hide amounts'}
+          >
+            {hideAmounts ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="hidden lg:flex">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Entry
+          </Button>
+        </div>
       </div>
 
       {/* Totals */}
@@ -121,6 +134,7 @@ export function Dashboard() {
         balance={totals.balance}
         currency={totals.currency}
         isLoading={totals.isLoading}
+        hideAmounts={hideAmounts}
       />
 
       {/* Filters */}
@@ -142,7 +156,11 @@ export function Dashboard() {
       {!isLoading && transactions.length === 0 ? (
         <EmptyState onAddClick={() => setIsAddDialogOpen(true)} />
       ) : (
-        <TransactionList transactions={transactions} isLoading={isLoading} />
+        <TransactionList
+          transactions={transactions}
+          isLoading={isLoading}
+          hideAmounts={hideAmounts}
+        />
       )}
 
       {/* Add Dialog */}

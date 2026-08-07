@@ -20,11 +20,33 @@ import { useCustomerPhotoUrl, type PhotoChange } from '@/hooks/use-customers'
 import type { LocalCustomer } from '@/lib/offline-db'
 import type { CustomerStatus } from '@/types/database'
 
+// Digits only, ignoring spaces and dashes people type out of habit
+const digitsOf = (value: string) => value.replace(/[\s-]/g, '')
+
+const IMEI_LENGTH = 15
+const PHONE_MAX_DIGITS = 11
+
 const customerSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required').max(120),
   work_name: z.string().min(1, 'Work name is required').max(200),
-  imei: z.string().max(50),
-  phone: z.string().max(30),
+  imei: z
+    .string()
+    .max(IMEI_LENGTH, `IMEI cannot be longer than ${IMEI_LENGTH} digits`)
+    .refine(
+      (value) => value === '' || /^\d+$/.test(digitsOf(value)),
+      'IMEI can only contain numbers'
+    )
+    .refine(
+      (value) => value === '' || digitsOf(value).length === IMEI_LENGTH,
+      `IMEI must be exactly ${IMEI_LENGTH} digits`
+    ),
+  phone: z
+    .string()
+    .max(PHONE_MAX_DIGITS, `Phone number cannot be longer than ${PHONE_MAX_DIGITS} digits`)
+    .refine(
+      (value) => value === '' || /^\d+$/.test(digitsOf(value)),
+      'Phone number can only contain numbers'
+    ),
   cnic: z.string().max(20),
   address: z.string().max(300),
   notes: z.string().max(1000),
@@ -105,13 +127,26 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
 
       <div className="space-y-2">
         <Label htmlFor="imei">IMEI number</Label>
-        <Input id="imei" inputMode="numeric" placeholder="Optional" {...register('imei')} />
+        <Input
+          id="imei"
+          inputMode="numeric"
+          maxLength={IMEI_LENGTH}
+          placeholder={`Optional — ${IMEI_LENGTH} digits`}
+          {...register('imei')}
+        />
         {errors.imei && <p className="text-sm text-destructive">{errors.imei.message}</p>}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="phone">Phone number</Label>
-        <Input id="phone" type="tel" placeholder="Optional" {...register('phone')} />
+        <Input
+          id="phone"
+          type="tel"
+          inputMode="numeric"
+          maxLength={PHONE_MAX_DIGITS}
+          placeholder="Optional — e.g., 03001234567"
+          {...register('phone')}
+        />
         {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
       </div>
 

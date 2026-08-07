@@ -9,6 +9,11 @@ export function formatCurrency(amount: number, currency: string = 'Rs') {
   return `${currency} ${amount.toLocaleString()}`
 }
 
+/** Placeholder shown in place of an amount while amounts are hidden */
+export function maskCurrency(currency: string = 'Rs') {
+  return `${currency} ••••`
+}
+
 export function formatDate(date: string | Date) {
   return new Date(date).toLocaleDateString('en-US', {
     year: 'numeric',

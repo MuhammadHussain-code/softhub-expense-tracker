@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MoreHorizontal, Pencil, Trash2, TrendingUp, TrendingDown, CloudOff, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn, formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, maskCurrency, formatDate } from '@/lib/utils'
 import { useStore } from '@/providers/store-provider'
 import { useDeleteTransaction } from '@/hooks/use-transactions'
 import { Button } from '@/components/ui/button'
@@ -28,9 +28,14 @@ import type { LocalTransaction } from '@/lib/offline-db'
 interface TransactionListProps {
   transactions: LocalTransaction[]
   isLoading: boolean
+  hideAmounts: boolean
 }
 
-export function TransactionList({ transactions, isLoading }: TransactionListProps) {
+export function TransactionList({
+  transactions,
+  isLoading,
+  hideAmounts,
+}: TransactionListProps) {
   const { activeStore } = useStore()
   const deleteMutation = useDeleteTransaction()
   const [editingTransaction, setEditingTransaction] = useState<LocalTransaction | null>(null)
@@ -134,8 +139,14 @@ export function TransactionList({ transactions, isLoading }: TransactionListProp
                   t.type === 'work' ? 'text-success' : 'text-destructive'
                 )}
               >
-                {t.type === 'work' ? '+' : '-'}
-                {formatCurrency(t.amount, currency)}
+                {hideAmounts ? (
+                  maskCurrency(currency)
+                ) : (
+                  <>
+                    {t.type === 'work' ? '+' : '-'}
+                    {formatCurrency(t.amount, currency)}
+                  </>
+                )}
               </span>
 
               <DropdownMenu>

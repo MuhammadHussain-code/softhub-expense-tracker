@@ -1,7 +1,7 @@
 import { TrendingUp, TrendingDown, Wallet } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, maskCurrency } from '@/lib/utils'
 
 interface TotalsCardsProps {
   income: number
@@ -9,6 +9,7 @@ interface TotalsCardsProps {
   balance: number
   currency: string
   isLoading: boolean
+  hideAmounts: boolean
 }
 
 export function TotalsCards({
@@ -17,7 +18,11 @@ export function TotalsCards({
   balance,
   currency,
   isLoading,
+  hideAmounts,
 }: TotalsCardsProps) {
+  const show = (amount: number) =>
+    hideAmounts ? maskCurrency(currency) : formatCurrency(amount, currency)
+
   if (isLoading) {
     return (
       <div className="grid gap-4 sm:grid-cols-3">
@@ -42,9 +47,7 @@ export function TotalsCards({
             <TrendingUp className="h-4 w-4 text-success" />
             Income
           </div>
-          <p className="mt-1 text-2xl font-bold text-success">
-            {formatCurrency(income, currency)}
-          </p>
+          <p className="mt-1 text-2xl font-bold text-success">{show(income)}</p>
         </CardContent>
       </Card>
 
@@ -55,9 +58,7 @@ export function TotalsCards({
             <TrendingDown className="h-4 w-4 text-destructive" />
             Expense
           </div>
-          <p className="mt-1 text-2xl font-bold text-destructive">
-            {formatCurrency(expense, currency)}
-          </p>
+          <p className="mt-1 text-2xl font-bold text-destructive">{show(expense)}</p>
         </CardContent>
       </Card>
 
@@ -71,11 +72,16 @@ export function TotalsCards({
           <p
             className={cn(
               'mt-1 text-2xl font-bold',
-              balance >= 0 ? 'text-success' : 'text-destructive'
+              // While hidden, stay neutral so the colour does not leak the sign
+              hideAmounts
+                ? 'text-foreground'
+                : balance >= 0
+                  ? 'text-success'
+                  : 'text-destructive'
             )}
           >
-            {formatCurrency(Math.abs(balance), currency)}
-            {balance < 0 && ' (deficit)'}
+            {show(Math.abs(balance))}
+            {!hideAmounts && balance < 0 && ' (deficit)'}
           </p>
         </CardContent>
       </Card>
