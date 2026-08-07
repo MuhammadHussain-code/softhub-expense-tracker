@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, Loader2, Trash2, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { compressImage } from '@/lib/image'
+import { CameraCapture } from './camera-capture'
 import type { PhotoChange } from '@/hooks/use-customers'
 
 interface CustomerPhotoInputProps {
@@ -18,6 +19,7 @@ export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputP
   const objectUrlRef = useRef<string | null>(null)
   const [preview, setPreview] = useState<string | null>(initialUrl)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isCameraOpen, setIsCameraOpen] = useState(false)
   // Once the user picks or removes a photo, the saved one no longer drives the preview
   const [isTouched, setIsTouched] = useState(false)
 
@@ -38,14 +40,11 @@ export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputP
     objectUrlRef.current = url
   }
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = '' // allow picking the same file again
-    if (!file) return
-
+  const acceptPhoto = async (source: Blob) => {
+    setIsCameraOpen(false)
     setIsProcessing(true)
     try {
-      const blob = await compressImage(file)
+      const blob = await compressImage(source)
       const url = URL.createObjectURL(blob)
       setObjectUrl(url)
       setPreview(url)
@@ -58,6 +57,20 @@ export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputP
       setIsProcessing(false)
     }
   }
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = '' // allow picking the same file again
+    if (!file) return
+    acceptPhoto(file)
+  }
+
+  // No camera (denied, unsupported, or insecure origin): fall back to the picker
+  const handleCameraUnavailable = useCallback(() => {
+    setIsCameraOpen(false)
+    toast.error('Camera not available. Pick a photo instead.')
+    inputRef.current?.click()
+  }, [])
 
   const handleRemove = () => {
     setObjectUrl(null)
@@ -93,7 +106,7 @@ export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputP
             variant="outline"
             size="sm"
             disabled={isProcessing}
-            onClick={() => inputRef.current?.click()}
+            onClick={() => setIsCameraOpen(true)}
           >
             {isProcessing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -117,6 +130,13 @@ export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputP
           )}
         </div>
       </div>
+
+      <CameraCapture
+        open={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onSelect={acceptPhoto}
+        onUnavailable={handleCameraUnavailable}
+      />
     </div>
   )
 }

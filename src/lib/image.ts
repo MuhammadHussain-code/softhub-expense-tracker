@@ -12,12 +12,12 @@ const QUALITY = 0.8
 export const PHOTO_MIME_TYPE = 'image/jpeg'
 
 /**
- * Resize and re-encode an image file as a JPEG blob.
- * Throws if the file cannot be decoded as an image.
+ * Resize and re-encode an image (a picked file or a camera frame) as a JPEG blob.
+ * Throws if it cannot be decoded as an image.
  */
-export async function compressImage(file: File): Promise<Blob> {
+export async function compressImage(source: Blob): Promise<Blob> {
   // `from-image` applies EXIF orientation, so phone photos are not sideways
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const bitmap = await createImageBitmap(source, { imageOrientation: 'from-image' })
 
   try {
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
