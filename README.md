@@ -7,6 +7,7 @@ A multi-tenant SaaS application for shop owners to track income and expenses.
 - User authentication (sign up, sign in, sign out)
 - Create and manage multiple stores
 - Track work income and expenses
+- Customer records (work done, IMEI, phone, CNIC, photo) with no payment data
 - Filter transactions by month, year, or date
 - View live totals (income, expense, balance)
 - Mobile-responsive design
@@ -77,6 +78,7 @@ src/
 │   ├── layout/       # App shell, sidebar, navigation
 │   ├── auth/         # Auth forms, protected route
 │   ├── stores/       # Store management
+│   ├── customers/    # Customer records CRUD
 │   └── transactions/ # Transaction CRUD
 ├── hooks/            # Custom React hooks
 ├── lib/              # Utilities, Supabase client
@@ -90,5 +92,8 @@ src/
 - **stores**: Store information (name, currency)
 - **store_members**: User-store relationships with roles
 - **transactions**: Income/expense entries
+- **customers**: Customer job records (no payment data); photos live in the private
+  `customer-photos` storage bucket at `{store_id}/{customer_id}.jpg`
 
 All tables use Row Level Security (RLS) to ensure users can only access their own data.
+Run every file in `supabase/migrations/` in order when setting up a new project.

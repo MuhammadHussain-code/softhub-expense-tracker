@@ -6,16 +6,167 @@ import {
   getLocalTransaction,
   saveLocalTransaction,
   deleteLocalTransaction,
+  getLocalCustomer,
+  saveLocalCustomer,
+  deleteLocalCustomer,
+  getLocalPhoto,
+  deleteLocalPhoto,
+  markPhotoUploaded,
   getSyncQueueCount,
   getLocalTransactions,
   saveLocalTransactions,
   setLastSyncTime,
   toLocalTransaction,
+  toLocalCustomer,
   isLocalId,
   type SyncQueueItem,
+  type SyncTable,
   type LocalTransaction,
+  type LocalCustomer,
 } from './offline-db'
-import type { Transaction, TransactionInsert, TransactionUpdate } from '@/types/database'
+import {
+  uploadCustomerPhoto,
+  deleteCustomerPhoto,
+  customerPhotoPath,
+} from './customer-photos'
+import type {
+  Transaction,
+  TransactionInsert,
+  TransactionUpdate,
+  Customer,
+  CustomerInsert,
+  CustomerUpdate,
+} from '@/types/database'
+
+/**
+ * A row as it exists on the server, for any synced table
+ */
+type ServerRow = Transaction | Customer
+
+/**
+ * A row as it exists in IndexedDB, for any synced table
+ */
+type LocalRecord = LocalTransaction | LocalCustomer
+
+/**
+ * Loosely typed write payload pulled off a queue item
+ */
+type WritePayload = Record<string, unknown>
+
+type SyncStatus = 'synced' | 'pending' | 'error'
+
+/**
+ * Everything the sync loop needs to know about one table. Keeping the Supabase
+ * calls inside each adapter means every query still uses a literal table name
+ * and stays fully typed.
+ */
+interface SyncTableAdapter {
+  getLocal(id: string): Promise<LocalRecord | undefined>
+  saveLocal(record: LocalRecord): Promise<void>
+  deleteLocal(id: string): Promise<void>
+  toLocal(row: ServerRow, status: SyncStatus): LocalRecord
+  fetchServer(id: string): Promise<{ data: ServerRow | null; error: { code?: string } | null }>
+  insertServer(data: WritePayload): Promise<{ data: ServerRow | null; error: unknown }>
+  updateServer(
+    id: string,
+    data: WritePayload
+  ): Promise<{ data: ServerRow | null; error: unknown }>
+  deleteServer(id: string): Promise<{ error: { code?: string } | null }>
+  /** Runs before an insert/update reaches the server (e.g. photo upload) */
+  prepareWrite?(data: WritePayload, storeId: string): Promise<WritePayload>
+  /** Runs after a row is removed, locally or on the server */
+  onDeleted?(id: string, storeId: string): Promise<void>
+}
+
+const adapters: Record<SyncTable, SyncTableAdapter> = {
+  transactions: {
+    getLocal: getLocalTransaction,
+    saveLocal: (record) => saveLocalTransaction(record as LocalTransaction),
+    deleteLocal: deleteLocalTransaction,
+    toLocal: (row, status) => toLocalTransaction(row as Transaction, status),
+    fetchServer: async (id) => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select()
+        .eq('id', id)
+        .single()
+      return { data: data as Transaction | null, error }
+    },
+    insertServer: async (data) => {
+      const { data: row, error } = await supabase
+        .from('transactions')
+        .insert(data as TransactionInsert)
+        .select()
+        .single()
+      return { data: row as Transaction | null, error }
+    },
+    updateServer: async (id, data) => {
+      const { data: row, error } = await supabase
+        .from('transactions')
+        .update(data as TransactionUpdate)
+        .eq('id', id)
+        .select()
+        .single()
+      return { data: row as Transaction | null, error }
+    },
+    deleteServer: async (id) => {
+      const { error } = await supabase.from('transactions').delete().eq('id', id)
+      return { error }
+    },
+  },
+  customers: {
+    getLocal: getLocalCustomer,
+    saveLocal: (record) => saveLocalCustomer(record as LocalCustomer),
+    deleteLocal: deleteLocalCustomer,
+    toLocal: (row, status) => toLocalCustomer(row as Customer, status),
+    fetchServer: async (id) => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select()
+        .eq('id', id)
+        .single()
+      return { data: data as Customer | null, error }
+    },
+    insertServer: async (data) => {
+      const { data: row, error } = await supabase
+        .from('customers')
+        .insert(data as CustomerInsert)
+        .select()
+        .single()
+      return { data: row as Customer | null, error }
+    },
+    updateServer: async (id, data) => {
+      const { data: row, error } = await supabase
+        .from('customers')
+        .update(data as CustomerUpdate)
+        .eq('id', id)
+        .select()
+        .single()
+      return { data: row as Customer | null, error }
+    },
+    deleteServer: async (id) => {
+      const { error } = await supabase.from('customers').delete().eq('id', id)
+      return { error }
+    },
+    // A customer photo taken offline lives in IndexedDB until this runs
+    prepareWrite: async (data, storeId) => {
+      const id = data.id as string | undefined
+      if (!id) return data
+
+      const photo = await getLocalPhoto(id)
+      if (!photo || photo.uploaded) return data
+
+      const path = await uploadCustomerPhoto(storeId, id, photo.blob)
+      await markPhotoUploaded(id)
+
+      return { ...data, photo_path: path }
+    },
+    onDeleted: async (id, storeId) => {
+      await deleteCustomerPhoto(customerPhotoPath(storeId, id))
+      await deleteLocalPhoto(id)
+    },
+  },
+}
 
 /**
  * Event types emitted by the sync service
@@ -156,17 +307,15 @@ class SyncService {
         console.error('Sync item failed:', error)
         
         if (item.retryCount >= MAX_RETRY_COUNT) {
-          // Max retries reached, remove from queue and mark transaction as error
+          // Max retries reached, remove from queue and mark the row as error
           await removeFromSyncQueue(item.id)
           if (item.operation !== 'delete') {
-            const localTx = await getLocalTransaction(
-              item.operation === 'create' 
-                ? (item.data as TransactionInsert & { id?: string }).id ?? ''
-                : (item.data as TransactionUpdate).id ?? ''
-            )
-            if (localTx) {
-              localTx.syncStatus = 'error'
-              await saveLocalTransaction(localTx)
+            const adapter = adapters[item.table]
+            const rowId = (item.data as WritePayload).id as string | undefined
+            const localRow = rowId ? await adapter.getLocal(rowId) : undefined
+            if (localRow) {
+              localRow.syncStatus = 'error'
+              await adapter.saveLocal(localRow)
             }
           }
           failed++
@@ -206,117 +355,118 @@ class SyncService {
    * Sync a create operation
    */
   private async syncCreate(item: SyncQueueItem): Promise<void> {
-    const insertData = item.data as TransactionInsert & { id?: string }
-    const localId = insertData.id
+    const adapter = adapters[item.table]
+    const insertData = { ...(item.data as WritePayload) }
+    const queuedId = insertData.id as string | undefined
 
-    // Remove local ID before inserting to server
-    const { id: _, ...dataWithoutId } = insertData
+    const payload = adapter.prepareWrite
+      ? await adapter.prepareWrite(insertData, item.storeId)
+      : insertData
 
-    const { data: serverTransaction, error } = await supabase
-      .from('transactions')
-      .insert(dataWithoutId)
-      .select()
-      .single()
+    // Temporary local IDs never reach the server; client-generated UUIDs do
+    if (queuedId && isLocalId(queuedId)) {
+      delete payload.id
+    }
+
+    const { data: serverRow, error } = await adapter.insertServer(payload)
 
     if (error) {
       throw error
     }
 
     // If we had a local ID, delete the local version and save with server ID
-    if (localId && isLocalId(localId)) {
-      await deleteLocalTransaction(localId)
+    if (queuedId && isLocalId(queuedId)) {
+      await adapter.deleteLocal(queuedId)
     }
 
     // Save the server version
-    const localTransaction = toLocalTransaction(serverTransaction as Transaction, 'synced')
-    await saveLocalTransaction(localTransaction)
+    if (serverRow) {
+      await adapter.saveLocal(adapter.toLocal(serverRow, 'synced'))
+    }
   }
 
   /**
    * Sync an update operation with last-write-wins conflict resolution
    */
   private async syncUpdate(item: SyncQueueItem): Promise<void> {
-    const updateData = item.data as TransactionUpdate & { id: string }
-    const { id, ...dataToUpdate } = updateData
+    const adapter = adapters[item.table]
+    const updateData = { ...(item.data as WritePayload) } as WritePayload & { id: string }
+    const { id } = updateData
 
     // First, check the server version for conflict resolution
-    const { data: serverVersion, error: fetchError } = await supabase
-      .from('transactions')
-      .select()
-      .eq('id', id)
-      .single()
+    const { data: serverVersion, error: fetchError } = await adapter.fetchServer(id)
 
     if (fetchError) {
-      // If not found, the transaction was deleted on server
+      // If not found, the row was deleted on server
       if (fetchError.code === 'PGRST116') {
-        await deleteLocalTransaction(id)
+        await adapter.deleteLocal(id)
         return
       }
       throw fetchError
     }
 
     // Get local version
-    const localVersion = await getLocalTransaction(id)
+    const localVersion = await adapter.getLocal(id)
 
     // Last-write-wins: compare timestamps
     if (localVersion && serverVersion) {
-      const serverTx = serverVersion as Transaction
-      const serverTime = new Date(serverTx.created_at).getTime()
+      const serverTime = new Date(serverVersion.created_at).getTime()
       const localTime = new Date(localVersion.updatedAt).getTime()
 
       // If server is newer, accept server version (discard local changes)
       if (serverTime > localTime) {
-        const updatedLocal = toLocalTransaction(serverVersion as Transaction, 'synced')
-        await saveLocalTransaction(updatedLocal)
+        await adapter.saveLocal(adapter.toLocal(serverVersion, 'synced'))
         return
       }
     }
 
+    const prepared = adapter.prepareWrite
+      ? await adapter.prepareWrite(updateData, item.storeId)
+      : updateData
+
+    const dataToUpdate = { ...prepared }
+    delete dataToUpdate.id
+
     // Local wins, push to server
-    const { data: updatedTransaction, error: updateError } = await supabase
-      .from('transactions')
-      .update(dataToUpdate)
-      .eq('id', id)
-      .select()
-      .single()
+    const { data: updatedRow, error: updateError } = await adapter.updateServer(
+      id,
+      dataToUpdate
+    )
 
     if (updateError) {
       throw updateError
     }
 
     // Update local version
-    const localTransaction = toLocalTransaction(updatedTransaction as Transaction, 'synced')
-    await saveLocalTransaction(localTransaction)
+    if (updatedRow) {
+      await adapter.saveLocal(adapter.toLocal(updatedRow, 'synced'))
+    }
   }
 
   /**
    * Sync a delete operation
    */
   private async syncDelete(item: SyncQueueItem): Promise<void> {
+    const adapter = adapters[item.table]
     const { id } = item.data as { id: string }
 
-    // If it's a local-only transaction, just remove it locally
+    // If it's a local-only row, just remove it locally
     if (isLocalId(id)) {
-      await deleteLocalTransaction(id)
+      await adapter.deleteLocal(id)
+      await adapter.onDeleted?.(id, item.storeId)
       return
     }
 
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', id)
+    const { error } = await adapter.deleteServer(id)
 
-    if (error) {
-      // If not found, it's already deleted on server
-      if (error.code === 'PGRST116') {
-        await deleteLocalTransaction(id)
-        return
-      }
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 means it is already gone on the server
       throw error
     }
 
     // Remove from local store
-    await deleteLocalTransaction(id)
+    await adapter.deleteLocal(id)
+    await adapter.onDeleted?.(id, item.storeId)
   }
 
   /**

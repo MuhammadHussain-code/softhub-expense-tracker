@@ -1,5 +1,17 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb'
-import type { Transaction, TransactionInsert, TransactionUpdate } from '@/types/database'
+import type {
+  Transaction,
+  TransactionInsert,
+  TransactionUpdate,
+  Customer,
+  CustomerInsert,
+  CustomerUpdate,
+} from '@/types/database'
+
+/**
+ * Tables that participate in offline sync
+ */
+export type SyncTable = 'transactions' | 'customers'
 
 /**
  * Sync queue item representing a pending operation to sync with the server
@@ -7,19 +19,46 @@ import type { Transaction, TransactionInsert, TransactionUpdate } from '@/types/
 export interface SyncQueueItem {
   id: string
   operation: 'create' | 'update' | 'delete'
-  table: 'transactions'
-  data: TransactionInsert | TransactionUpdate | { id: string }
+  table: SyncTable
+  data:
+    | TransactionInsert
+    | TransactionUpdate
+    | CustomerInsert
+    | CustomerUpdate
+    | { id: string }
   storeId: string
   createdAt: string
   retryCount: number
 }
 
 /**
+ * Fields every locally cached row carries on top of its server row
+ */
+export interface LocalRecordMeta {
+  syncStatus: 'synced' | 'pending' | 'error'
+  localId?: string // Temporary ID for offline-created rows
+  updatedAt: string
+}
+
+/**
  * Local transaction with sync status
  */
-export interface LocalTransaction extends Transaction {
-  syncStatus: 'synced' | 'pending' | 'error'
-  localId?: string // Temporary ID for offline-created transactions
+export interface LocalTransaction extends Transaction, LocalRecordMeta {}
+
+/**
+ * Local customer with sync status
+ */
+export interface LocalCustomer extends Customer, LocalRecordMeta {}
+
+/**
+ * A photo held on this device, waiting to be uploaded or kept as an
+ * offline display cache once uploaded.
+ */
+export interface LocalPhoto {
+  customerId: string
+  storeId: string
+  blob: Blob
+  uploaded: boolean
   updatedAt: string
 }
 
@@ -44,6 +83,22 @@ interface OfflineDBSchema extends DBSchema {
       'by-sync-status': string
     }
   }
+  customers: {
+    key: string
+    value: LocalCustomer
+    indexes: {
+      'by-store': string
+      'by-date': string
+      'by-sync-status': string
+    }
+  }
+  photoBlobs: {
+    key: string
+    value: LocalPhoto
+    indexes: {
+      'by-store': string
+    }
+  }
   syncQueue: {
     key: string
     value: SyncQueueItem
@@ -59,7 +114,7 @@ interface OfflineDBSchema extends DBSchema {
 }
 
 const DB_NAME = 'expense-tracker-offline'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let dbInstance: IDBPDatabase<OfflineDBSchema> | null = null
 
@@ -79,6 +134,20 @@ export async function getDB(): Promise<IDBPDatabase<OfflineDBSchema>> {
         transactionStore.createIndex('by-store', 'store_id')
         transactionStore.createIndex('by-date', 'date')
         transactionStore.createIndex('by-sync-status', 'syncStatus')
+      }
+
+      // Create customers store (added in v2)
+      if (!db.objectStoreNames.contains('customers')) {
+        const customerStore = db.createObjectStore('customers', { keyPath: 'id' })
+        customerStore.createIndex('by-store', 'store_id')
+        customerStore.createIndex('by-date', 'date')
+        customerStore.createIndex('by-sync-status', 'syncStatus')
+      }
+
+      // Create photo blob store (added in v2)
+      if (!db.objectStoreNames.contains('photoBlobs')) {
+        const photoStore = db.createObjectStore('photoBlobs', { keyPath: 'customerId' })
+        photoStore.createIndex('by-store', 'storeId')
       }
 
       // Create sync queue store
@@ -169,6 +238,91 @@ export async function clearStoreTransactions(storeId: string): Promise<void> {
   }
   
   await tx.done
+}
+
+// =====================
+// Customer Operations
+// =====================
+
+/**
+ * Get all customers for a store
+ */
+export async function getLocalCustomers(storeId: string): Promise<LocalCustomer[]> {
+  const db = await getDB()
+  return db.getAllFromIndex('customers', 'by-store', storeId)
+}
+
+/**
+ * Get a single customer by ID
+ */
+export async function getLocalCustomer(id: string): Promise<LocalCustomer | undefined> {
+  const db = await getDB()
+  return db.get('customers', id)
+}
+
+/**
+ * Save a customer locally (create or update)
+ */
+export async function saveLocalCustomer(customer: LocalCustomer): Promise<void> {
+  const db = await getDB()
+  await db.put('customers', customer)
+}
+
+/**
+ * Save multiple customers locally (for bulk sync)
+ */
+export async function saveLocalCustomers(customers: LocalCustomer[]): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction('customers', 'readwrite')
+  await Promise.all([...customers.map((c) => tx.store.put(c)), tx.done])
+}
+
+/**
+ * Delete a customer locally
+ */
+export async function deleteLocalCustomer(id: string): Promise<void> {
+  const db = await getDB()
+  await db.delete('customers', id)
+}
+
+// =====================
+// Photo Blob Operations
+// =====================
+
+/**
+ * Store a photo for a customer on this device
+ */
+export async function saveLocalPhoto(photo: Omit<LocalPhoto, 'updatedAt'>): Promise<void> {
+  const db = await getDB()
+  await db.put('photoBlobs', { ...photo, updatedAt: new Date().toISOString() })
+}
+
+/**
+ * Get the locally held photo for a customer
+ */
+export async function getLocalPhoto(customerId: string): Promise<LocalPhoto | undefined> {
+  const db = await getDB()
+  return db.get('photoBlobs', customerId)
+}
+
+/**
+ * Mark a locally held photo as uploaded (it stays as an offline display cache)
+ */
+export async function markPhotoUploaded(customerId: string): Promise<void> {
+  const db = await getDB()
+  const photo = await db.get('photoBlobs', customerId)
+  if (photo) {
+    photo.uploaded = true
+    await db.put('photoBlobs', photo)
+  }
+}
+
+/**
+ * Remove a customer's photo from this device
+ */
+export async function deleteLocalPhoto(customerId: string): Promise<void> {
+  const db = await getDB()
+  await db.delete('photoBlobs', customerId)
 }
 
 // =====================
@@ -312,12 +466,28 @@ export function toLocalTransaction(
 }
 
 /**
+ * Convert a server customer to a local customer
+ */
+export function toLocalCustomer(
+  customer: Customer,
+  syncStatus: 'synced' | 'pending' | 'error' = 'synced'
+): LocalCustomer {
+  return {
+    ...customer,
+    syncStatus,
+    updatedAt: customer.created_at,
+  }
+}
+
+/**
  * Clear all offline data (for logout)
  */
 export async function clearAllOfflineData(): Promise<void> {
   const db = await getDB()
   await Promise.all([
     db.clear('transactions'),
+    db.clear('customers'),
+    db.clear('photoBlobs'),
     db.clear('syncQueue'),
     db.clear('metadata'),
   ])

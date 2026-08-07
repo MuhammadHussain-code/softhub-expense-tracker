@@ -27,6 +27,9 @@ const ResetPassword = lazy(() =>
 const NewStore = lazy(() =>
   import('@/pages/stores/new').then((m) => ({ default: m.NewStore }))
 )
+const Customers = lazy(() =>
+  import('@/pages/customers').then((m) => ({ default: m.Customers }))
+)
 const Dashboard = lazy(() =>
   import('@/pages/dashboard').then((m) => ({ default: m.Dashboard }))
 )
@@ -59,6 +62,7 @@ function AppRoutes() {
 
           {/* Main App with Store Context */}
           <Route element={<AppShell />}>
+            <Route path="/customers" element={<Customers />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

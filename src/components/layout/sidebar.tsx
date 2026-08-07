@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Settings, LogOut, Wifi, WifiOff, RefreshCw, Cloud, CloudOff } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, Users, Wifi, WifiOff, RefreshCw, Cloud, CloudOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/providers/auth-provider'
 import { useTheme } from '@/providers/theme-provider'
@@ -10,6 +10,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { StoreSwitcher } from './store-switcher'
 
 const navItems = [
+  { to: '/customers', icon: Users, label: 'Customers' },
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]

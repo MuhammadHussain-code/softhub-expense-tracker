@@ -90,6 +90,57 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          id: string
+          store_id: string
+          work_name: string
+          customer_name: string
+          imei: string
+          phone: string
+          cnic: string
+          address: string
+          notes: string
+          photo_path: string | null
+          status: 'pending' | 'delivered'
+          date: string
+          created_at: string
+          created_by: string
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          work_name: string
+          customer_name: string
+          imei?: string
+          phone?: string
+          cnic?: string
+          address?: string
+          notes?: string
+          photo_path?: string | null
+          status?: 'pending' | 'delivered'
+          date?: string
+          created_at?: string
+          created_by: string
+        }
+        Update: {
+          id?: string
+          store_id?: string
+          work_name?: string
+          customer_name?: string
+          imei?: string
+          phone?: string
+          cnic?: string
+          address?: string
+          notes?: string
+          photo_path?: string | null
+          status?: 'pending' | 'delivered'
+          date?: string
+          created_at?: string
+          created_by?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -105,3 +156,7 @@ export type StoreMember = Database['public']['Tables']['store_members']['Row']
 export type Transaction = Database['public']['Tables']['transactions']['Row']
 export type TransactionInsert = Database['public']['Tables']['transactions']['Insert']
 export type TransactionUpdate = Database['public']['Tables']['transactions']['Update']
+export type Customer = Database['public']['Tables']['customers']['Row']
+export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
+export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
+export type CustomerStatus = Customer['status']
