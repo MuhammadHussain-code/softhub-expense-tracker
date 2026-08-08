@@ -29,7 +29,8 @@ New table `customers` (migration `003_customers.sql`). No amount/currency column
 | `store_id` | uuid FK → stores | cascade delete |
 | `work_name` | text NOT NULL | the job taken in |
 | `customer_name` | text NOT NULL | |
-| `imei` | text NOT NULL DEFAULT '' | optional in UI |
+| `imei` | text NOT NULL DEFAULT '' | optional in UI; shown as "IMEI 1" |
+| `imei2` | text NOT NULL DEFAULT '' | added in migration 004 for dual-SIM phones |
 | `phone` | text NOT NULL DEFAULT '' | optional in UI |
 | `cnic` | text NOT NULL DEFAULT '' | optional in UI |
 | `address` | text NOT NULL DEFAULT '' | optional in UI |

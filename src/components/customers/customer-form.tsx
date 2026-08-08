@@ -26,20 +26,24 @@ const digitsOf = (value: string) => value.replace(/[\s-]/g, '')
 const IMEI_LENGTH = 15
 const PHONE_MAX_DIGITS = 11
 
-const customerSchema = z.object({
-  customer_name: z.string().min(1, 'Customer name is required').max(120),
-  work_name: z.string().min(1, 'Work name is required').max(200),
-  imei: z
+const imeiField = (label: string) =>
+  z
     .string()
-    .max(IMEI_LENGTH, `IMEI cannot be longer than ${IMEI_LENGTH} digits`)
+    .max(IMEI_LENGTH, `${label} cannot be longer than ${IMEI_LENGTH} digits`)
     .refine(
       (value) => value === '' || /^\d+$/.test(digitsOf(value)),
-      'IMEI can only contain numbers'
+      `${label} can only contain numbers`
     )
     .refine(
       (value) => value === '' || digitsOf(value).length === IMEI_LENGTH,
-      `IMEI must be exactly ${IMEI_LENGTH} digits`
-    ),
+      `${label} must be exactly ${IMEI_LENGTH} digits`
+    )
+
+const customerSchema = z.object({
+  customer_name: z.string().min(1, 'Customer name is required').max(120),
+  work_name: z.string().min(1, 'Work name is required').max(200),
+  imei: imeiField('IMEI 1'),
+  imei2: imeiField('IMEI 2'),
   phone: z
     .string()
     .max(PHONE_MAX_DIGITS, `Phone number cannot be longer than ${PHONE_MAX_DIGITS} digits`)
@@ -83,6 +87,7 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
       customer_name: initialData?.customer_name ?? '',
       work_name: initialData?.work_name ?? '',
       imei: initialData?.imei ?? '',
+      imei2: initialData?.imei2 ?? '',
       phone: initialData?.phone ?? '',
       cnic: initialData?.cnic ?? '',
       address: initialData?.address ?? '',
@@ -126,7 +131,7 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="imei">IMEI number</Label>
+        <Label htmlFor="imei">IMEI 1</Label>
         <Input
           id="imei"
           inputMode="numeric"
@@ -135,6 +140,18 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
           {...register('imei')}
         />
         {errors.imei && <p className="text-sm text-destructive">{errors.imei.message}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="imei2">IMEI 2</Label>
+        <Input
+          id="imei2"
+          inputMode="numeric"
+          maxLength={IMEI_LENGTH}
+          placeholder="Optional — second SIM slot"
+          {...register('imei2')}
+        />
+        {errors.imei2 && <p className="text-sm text-destructive">{errors.imei2.message}</p>}
       </div>
 
       <div className="space-y-2">

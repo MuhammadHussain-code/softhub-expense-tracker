@@ -36,6 +36,7 @@ export interface CustomerFields {
   work_name: string
   customer_name: string
   imei: string
+  imei2: string
   phone: string
   cnic: string
   address: string
@@ -54,15 +55,19 @@ export interface UpdateCustomerData extends CustomerFields {
 }
 
 /**
- * Match a customer against the search box: name, phone, IMEI or CNIC.
+ * Match a customer against the search box: name, phone, either IMEI, or CNIC.
  */
 function matchesSearch(customer: LocalCustomer, search: string): boolean {
   const needle = search.trim().toLowerCase()
   if (!needle) return true
 
-  return [customer.customer_name, customer.phone, customer.imei, customer.cnic].some(
-    (field) => (field ?? '').toLowerCase().includes(needle)
-  )
+  return [
+    customer.customer_name,
+    customer.phone,
+    customer.imei,
+    customer.imei2,
+    customer.cnic,
+  ].some((field) => (field ?? '').toLowerCase().includes(needle))
 }
 
 /**

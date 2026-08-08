@@ -97,6 +97,7 @@ export type Database = {
           work_name: string
           customer_name: string
           imei: string
+          imei2: string
           phone: string
           cnic: string
           address: string
@@ -113,6 +114,7 @@ export type Database = {
           work_name: string
           customer_name: string
           imei?: string
+          imei2?: string
           phone?: string
           cnic?: string
           address?: string
@@ -129,6 +131,7 @@ export type Database = {
           work_name?: string
           customer_name?: string
           imei?: string
+          imei2?: string
           phone?: string
           cnic?: string
           address?: string

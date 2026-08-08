@@ -178,7 +178,8 @@ function CustomerRow({
               className="mb-3 max-h-64 w-full rounded-md object-contain"
             />
           )}
-          <DetailRow label="IMEI" value={customer.imei} />
+          <DetailRow label={customer.imei2 ? 'IMEI 1' : 'IMEI'} value={customer.imei} />
+          <DetailRow label="IMEI 2" value={customer.imei2} />
           <DetailRow label="Phone" value={customer.phone} />
           <DetailRow label="CNIC" value={customer.cnic} />
           <DetailRow label="Address" value={customer.address} />
@@ -215,6 +216,7 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
         customer_name: customer.customer_name,
         work_name: customer.work_name,
         imei: customer.imei,
+        imei2: customer.imei2,
         phone: customer.phone,
         cnic: customer.cnic,
         address: customer.address,
