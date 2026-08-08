@@ -98,11 +98,13 @@ export type Database = {
           customer_name: string
           imei: string
           imei2: string
+          model: string
           phone: string
           cnic: string
           address: string
           notes: string
           photo_path: string | null
+          photo_back_path: string | null
           status: 'pending' | 'delivered'
           date: string
           created_at: string
@@ -115,11 +117,13 @@ export type Database = {
           customer_name: string
           imei?: string
           imei2?: string
+          model?: string
           phone?: string
           cnic?: string
           address?: string
           notes?: string
           photo_path?: string | null
+          photo_back_path?: string | null
           status?: 'pending' | 'delivered'
           date?: string
           created_at?: string
@@ -132,11 +136,13 @@ export type Database = {
           customer_name?: string
           imei?: string
           imei2?: string
+          model?: string
           phone?: string
           cnic?: string
           address?: string
           notes?: string
           photo_path?: string | null
+          photo_back_path?: string | null
           status?: 'pending' | 'delivered'
           date?: string
           created_at?: string

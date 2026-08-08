@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CustomerPhotoInput } from './customer-photo-input'
-import { useCustomerPhotoUrl, type PhotoChange } from '@/hooks/use-customers'
+import { useCustomerPhotoUrl, type PhotoChange, type PhotoChanges } from '@/hooks/use-customers'
 import type { LocalCustomer } from '@/lib/offline-db'
 import type { CustomerStatus } from '@/types/database'
 
@@ -40,6 +40,7 @@ const imeiField = (label: string) =>
     )
 
 const customerSchema = z.object({
+  model: z.string().max(120),
   customer_name: z.string().min(1, 'Customer name is required').max(120),
   work_name: z.string().min(1, 'Work name is required').max(200),
   imei: imeiField('IMEI 1'),
@@ -61,7 +62,7 @@ const customerSchema = z.object({
 export type CustomerFormData = z.infer<typeof customerSchema>
 
 export interface CustomerFormSubmit extends CustomerFormData {
-  photo: PhotoChange
+  photos: PhotoChanges
 }
 
 interface CustomerFormProps {
@@ -72,8 +73,10 @@ interface CustomerFormProps {
 
 export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFormProps) {
   const today = new Date().toISOString().split('T')[0] ?? ''
-  const savedPhotoUrl = useCustomerPhotoUrl(initialData)
-  const [photo, setPhoto] = useState<PhotoChange>(undefined)
+  const savedFrontUrl = useCustomerPhotoUrl(initialData, 'front')
+  const savedBackUrl = useCustomerPhotoUrl(initialData, 'back')
+  const [frontPhoto, setFrontPhoto] = useState<PhotoChange>(undefined)
+  const [backPhoto, setBackPhoto] = useState<PhotoChange>(undefined)
 
   const {
     register,
@@ -84,6 +87,7 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
   } = useForm({
     resolver: zodResolver(customerSchema),
     defaultValues: {
+      model: initialData?.model ?? '',
       customer_name: initialData?.customer_name ?? '',
       work_name: initialData?.work_name ?? '',
       imei: initialData?.imei ?? '',
@@ -101,7 +105,8 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
   const status = watch('status')
 
   const handleFormSubmit = async (data: unknown) => {
-    await onSubmit({ ...(data as CustomerFormData), photo })
+    const photos: PhotoChanges = { front: frontPhoto, back: backPhoto }
+    await onSubmit({ ...(data as CustomerFormData), photos })
   }
 
   return (
@@ -109,6 +114,16 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
       {/* Driven by the Select and DateInput below via setValue */}
       <input type="hidden" {...register('status')} />
       <input type="hidden" {...register('date')} />
+
+      <div className="space-y-2">
+        <Label htmlFor="model">Model number</Label>
+        <Input
+          id="model"
+          placeholder="e.g., Realme Note 50"
+          {...register('model')}
+        />
+        {errors.model && <p className="text-sm text-destructive">{errors.model.message}</p>}
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="customer_name">Customer name</Label>
@@ -179,7 +194,17 @@ export function CustomerForm({ initialData, onSubmit, isSubmitting }: CustomerFo
         {errors.address && <p className="text-sm text-destructive">{errors.address.message}</p>}
       </div>
 
-      <CustomerPhotoInput initialUrl={savedPhotoUrl} onChange={setPhoto} />
+      <CustomerPhotoInput
+        label="Front photo"
+        initialUrl={savedFrontUrl}
+        onChange={setFrontPhoto}
+      />
+
+      <CustomerPhotoInput
+        label="Back photo"
+        initialUrl={savedBackUrl}
+        onChange={setBackPhoto}
+      />
 
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>

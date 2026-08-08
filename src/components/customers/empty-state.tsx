@@ -15,7 +15,7 @@ export function CustomersEmptyState({ onAddClick, hasSearch }: CustomersEmptySta
         </div>
         <h3 className="mb-2 text-lg font-medium">No matching customer</h3>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Nothing matched that name, phone, IMEI or CNIC.
+          Nothing matched that name, model, phone, IMEI or CNIC.
         </p>
       </div>
     )

@@ -51,11 +51,30 @@ export interface LocalTransaction extends Transaction, LocalRecordMeta {}
 export interface LocalCustomer extends Customer, LocalRecordMeta {}
 
 /**
+ * Which side of the device a photo shows
+ */
+export type PhotoSlot = 'front' | 'back'
+
+export const PHOTO_SLOTS: PhotoSlot[] = ['front', 'back']
+
+/**
+ * Key used in the photoBlobs store. The front photo keeps the bare customer id
+ * so records written before the back slot existed still resolve.
+ */
+export function photoKey(customerId: string, slot: PhotoSlot = 'front'): string {
+  return slot === 'front' ? customerId : `${customerId}:${slot}`
+}
+
+/**
  * A photo held on this device, waiting to be uploaded or kept as an
  * offline display cache once uploaded.
  */
 export interface LocalPhoto {
+  /** Store key — see photoKey(); not always the bare customer id */
   customerId: string
+  /** The customer this photo belongs to */
+  ownerId: string
+  slot: PhotoSlot
   storeId: string
   blob: Blob
   uploaded: boolean
@@ -290,27 +309,49 @@ export async function deleteLocalCustomer(id: string): Promise<void> {
 // =====================
 
 /**
- * Store a photo for a customer on this device
+ * Store one of a customer's photos on this device
  */
-export async function saveLocalPhoto(photo: Omit<LocalPhoto, 'updatedAt'>): Promise<void> {
+export async function saveLocalPhoto(photo: {
+  customerId: string
+  storeId: string
+  blob: Blob
+  uploaded: boolean
+  slot?: PhotoSlot
+}): Promise<void> {
   const db = await getDB()
-  await db.put('photoBlobs', { ...photo, updatedAt: new Date().toISOString() })
+  const slot = photo.slot ?? 'front'
+  await db.put('photoBlobs', {
+    customerId: photoKey(photo.customerId, slot),
+    ownerId: photo.customerId,
+    slot,
+    storeId: photo.storeId,
+    blob: photo.blob,
+    uploaded: photo.uploaded,
+    updatedAt: new Date().toISOString(),
+  })
 }
 
 /**
- * Get the locally held photo for a customer
+ * Get one of the locally held photos for a customer
  */
-export async function getLocalPhoto(customerId: string): Promise<LocalPhoto | undefined> {
+export async function getLocalPhoto(
+  customerId: string,
+  slot: PhotoSlot = 'front'
+): Promise<LocalPhoto | undefined> {
   const db = await getDB()
-  return db.get('photoBlobs', customerId)
+  return db.get('photoBlobs', photoKey(customerId, slot))
 }
 
 /**
  * Mark a locally held photo as uploaded (it stays as an offline display cache)
  */
-export async function markPhotoUploaded(customerId: string): Promise<void> {
+export async function markPhotoUploaded(
+  customerId: string,
+  slot: PhotoSlot = 'front'
+): Promise<void> {
   const db = await getDB()
-  const photo = await db.get('photoBlobs', customerId)
+  const key = photoKey(customerId, slot)
+  const photo = await db.get('photoBlobs', key)
   if (photo) {
     photo.uploaded = true
     await db.put('photoBlobs', photo)
@@ -318,11 +359,12 @@ export async function markPhotoUploaded(customerId: string): Promise<void> {
 }
 
 /**
- * Remove a customer's photo from this device
+ * Remove a customer's photo from this device. Without a slot, both go.
  */
-export async function deleteLocalPhoto(customerId: string): Promise<void> {
+export async function deleteLocalPhoto(customerId: string, slot?: PhotoSlot): Promise<void> {
   const db = await getDB()
-  await db.delete('photoBlobs', customerId)
+  const slots = slot ? [slot] : PHOTO_SLOTS
+  await Promise.all(slots.map((s) => db.delete('photoBlobs', photoKey(customerId, s))))
 }
 
 // =====================

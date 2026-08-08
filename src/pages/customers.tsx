@@ -36,7 +36,7 @@ export function Customers() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, phone, IMEI or CNIC…"
+          placeholder="Search name, model, phone, IMEI or CNIC…"
           className="pl-9"
         />
       </div>

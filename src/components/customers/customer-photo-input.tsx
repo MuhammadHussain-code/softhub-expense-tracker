@@ -8,13 +8,15 @@ import { CameraCapture } from './camera-capture'
 import type { PhotoChange } from '@/hooks/use-customers'
 
 interface CustomerPhotoInputProps {
+  /** Shown above the picker, e.g. "Front photo" */
+  label: string
   /** URL of the already-saved photo, if any (resolves asynchronously) */
   initialUrl: string | null
   /** undefined = unchanged, null = remove, Blob = replace */
   onChange: (photo: PhotoChange) => void
 }
 
-export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputProps) {
+export function CustomerPhotoInput({ label, initialUrl, onChange }: CustomerPhotoInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const objectUrlRef = useRef<string | null>(null)
   const [preview, setPreview] = useState<string | null>(initialUrl)
@@ -81,7 +83,7 @@ export function CustomerPhotoInput({ initialUrl, onChange }: CustomerPhotoInputP
 
   return (
     <div className="space-y-2">
-      <Label>Photo</Label>
+      <Label>{label}</Label>
 
       <div className="flex items-center gap-3">
         <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">

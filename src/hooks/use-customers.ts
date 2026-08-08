@@ -15,7 +15,9 @@ import {
   markPhotoUploaded,
   addToSyncQueue,
   toLocalCustomer,
+  PHOTO_SLOTS,
   type LocalCustomer,
+  type PhotoSlot,
 } from '@/lib/offline-db'
 import {
   uploadCustomerPhoto,
@@ -32,11 +34,21 @@ import type { Customer, CustomerInsert, CustomerUpdate, CustomerStatus } from '@
  */
 export type PhotoChange = Blob | null | undefined
 
+/** One entry per photo slot: front and back of the device */
+export type PhotoChanges = Partial<Record<PhotoSlot, PhotoChange>>
+
+/** Column on `customers` that stores the path for a given slot */
+const PHOTO_PATH_COLUMN: Record<PhotoSlot, 'photo_path' | 'photo_back_path'> = {
+  front: 'photo_path',
+  back: 'photo_back_path',
+}
+
 export interface CustomerFields {
   work_name: string
   customer_name: string
   imei: string
   imei2: string
+  model: string
   phone: string
   cnic: string
   address: string
@@ -46,16 +58,17 @@ export interface CustomerFields {
 }
 
 export interface CreateCustomerData extends CustomerFields {
-  photo?: PhotoChange
+  photos?: PhotoChanges
 }
 
 export interface UpdateCustomerData extends CustomerFields {
   id: string
-  photo?: PhotoChange
+  photos?: PhotoChanges
 }
 
 /**
- * Match a customer against the search box: name, phone, either IMEI, or CNIC.
+ * Match a customer against the search box: name, model, phone, either IMEI,
+ * or CNIC.
  */
 function matchesSearch(customer: LocalCustomer, search: string): boolean {
   const needle = search.trim().toLowerCase()
@@ -63,6 +76,7 @@ function matchesSearch(customer: LocalCustomer, search: string): boolean {
 
   return [
     customer.customer_name,
+    customer.model,
     customer.phone,
     customer.imei,
     customer.imei2,
@@ -139,33 +153,49 @@ export function useCreateCustomer() {
       // IDs are generated here (not by the server) so the photo's storage path
       // is known before the row exists, online or offline
       const id = crypto.randomUUID()
-      const { photo, ...fields } = data
+      const { photos = {}, ...fields } = data
 
       const insertData: CustomerInsert = {
         id,
         store_id: activeStore.id,
         ...fields,
         photo_path: null,
+        photo_back_path: null,
         created_by: user.id,
       }
 
-      if (photo) {
+      // Keep every picked photo on the device first, so nothing is lost if the
+      // upload or the insert fails
+      for (const slot of PHOTO_SLOTS) {
+        const photo = photos[slot]
+        if (!photo) continue
         await saveLocalPhoto({
           customerId: id,
           storeId: activeStore.id,
           blob: photo,
           uploaded: false,
+          slot,
         })
       }
 
       if (isOnline) {
-        if (photo) {
+        let hasPendingUpload = false
+
+        for (const slot of PHOTO_SLOTS) {
+          const photo = photos[slot]
+          if (!photo) continue
           try {
-            insertData.photo_path = await uploadCustomerPhoto(activeStore.id, id, photo)
-            await markPhotoUploaded(id)
+            insertData[PHOTO_PATH_COLUMN[slot]] = await uploadCustomerPhoto(
+              activeStore.id,
+              id,
+              photo,
+              slot
+            )
+            await markPhotoUploaded(id, slot)
           } catch (error) {
             // Saving the customer matters more than the photo; sync retries it
             console.error('Photo upload failed, will retry on next sync:', error)
+            hasPendingUpload = true
           }
         }
 
@@ -179,7 +209,7 @@ export function useCreateCustomer() {
 
         await saveLocalCustomer(toLocalCustomer(customer as Customer, 'synced'))
 
-        if (photo && !insertData.photo_path) {
+        if (hasPendingUpload) {
           await addToSyncQueue({
             operation: 'update',
             table: 'customers',
@@ -196,6 +226,7 @@ export function useCreateCustomer() {
         store_id: activeStore.id,
         ...fields,
         photo_path: null,
+        photo_back_path: null,
         created_at: now,
         created_by: user.id,
         syncStatus: 'pending',
@@ -228,37 +259,47 @@ export function useUpdateCustomer() {
 
       const isOnline = syncService.getIsOnline()
       const now = new Date().toISOString()
-      const { id, photo, ...fields } = data
+      const { id, photos = {}, ...fields } = data
 
       const existing = await getLocalCustomer(id)
       const updateData: CustomerUpdate = { ...fields }
       let photoPendingUpload = false
 
-      if (photo === null) {
-        // Removing the photo
-        await deleteLocalPhoto(id)
-        updateData.photo_path = null
-        if (isOnline && existing?.photo_path) {
-          await deleteCustomerPhoto(existing.photo_path)
+      for (const slot of PHOTO_SLOTS) {
+        const photo = photos[slot]
+        if (photo === undefined) continue // slot untouched
+
+        const column = PHOTO_PATH_COLUMN[slot]
+
+        if (photo === null) {
+          // Removing this photo
+          await deleteLocalPhoto(id, slot)
+          updateData[column] = null
+          const existingPath = existing?.[column]
+          if (isOnline && existingPath) {
+            await deleteCustomerPhoto(existingPath)
+          }
+          continue
         }
-      } else if (photo) {
+
         await saveLocalPhoto({
           customerId: id,
           storeId: activeStore.id,
           blob: photo,
           uploaded: false,
+          slot,
         })
-        photoPendingUpload = true
 
         if (isOnline) {
           try {
-            updateData.photo_path = await uploadCustomerPhoto(activeStore.id, id, photo)
-            await markPhotoUploaded(id)
-            photoPendingUpload = false
+            updateData[column] = await uploadCustomerPhoto(activeStore.id, id, photo, slot)
+            await markPhotoUploaded(id, slot)
           } catch (error) {
             console.error('Photo upload failed, will retry on next sync:', error)
+            photoPendingUpload = true
           }
         }
+        // Offline: the queued update below carries the upload
       }
 
       if (isOnline) {
@@ -292,7 +333,12 @@ export function useUpdateCustomer() {
       const updatedCustomer: LocalCustomer = {
         ...existing,
         ...fields,
-        photo_path: updateData.photo_path === undefined ? existing.photo_path : updateData.photo_path,
+        photo_path:
+          updateData.photo_path === undefined ? existing.photo_path : updateData.photo_path,
+        photo_back_path:
+          updateData.photo_back_path === undefined
+            ? existing.photo_back_path
+            : updateData.photo_back_path,
         syncStatus: 'pending',
         updatedAt: now,
       }
@@ -327,7 +373,9 @@ export function useDeleteCustomer() {
         const { error } = await supabase.from('customers').delete().eq('id', id)
         if (error) throw error
 
-        await deleteCustomerPhoto(customerPhotoPath(activeStore.id, id))
+        for (const slot of PHOTO_SLOTS) {
+          await deleteCustomerPhoto(customerPhotoPath(activeStore.id, id, slot))
+        }
         await deleteLocalCustomer(id)
         await deleteLocalPhoto(id)
         return
@@ -351,10 +399,13 @@ export function useDeleteCustomer() {
  * Resolve a customer's photo to a displayable URL: the device copy first (works
  * offline and shows un-uploaded photos), then a signed URL from storage.
  */
-export function useCustomerPhotoUrl(customer: LocalCustomer | null | undefined): string | null {
+export function useCustomerPhotoUrl(
+  customer: LocalCustomer | null | undefined,
+  slot: PhotoSlot = 'front'
+): string | null {
   const [url, setUrl] = useState<string | null>(null)
   const customerId = customer?.id ?? null
-  const photoPath = customer?.photo_path ?? null
+  const photoPath = customer?.[PHOTO_PATH_COLUMN[slot]] ?? null
 
   useEffect(() => {
     let cancelled = false
@@ -366,7 +417,7 @@ export function useCustomerPhotoUrl(customer: LocalCustomer | null | undefined):
         return
       }
 
-      const local = await getLocalPhoto(customerId)
+      const local = await getLocalPhoto(customerId, slot)
       if (local) {
         objectUrl = URL.createObjectURL(local.blob)
         if (cancelled) {
@@ -393,7 +444,7 @@ export function useCustomerPhotoUrl(customer: LocalCustomer | null | undefined):
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [customerId, photoPath])
+  }, [customerId, photoPath, slot])
 
   return url
 }

@@ -35,7 +35,9 @@ New table `customers` (migration `003_customers.sql`). No amount/currency column
 | `cnic` | text NOT NULL DEFAULT '' | optional in UI |
 | `address` | text NOT NULL DEFAULT '' | optional in UI |
 | `notes` | text NOT NULL DEFAULT '' | optional in UI |
-| `photo_path` | text NULL | storage object path; null until an upload succeeds |
+| `model` | text NOT NULL DEFAULT '' | device model; migration 005, shown first in the form |
+| `photo_path` | text NULL | front photo's storage path; null until an upload succeeds |
+| `photo_back_path` | text NULL | back photo; migration 005 |
 | `status` | text NOT NULL | `CHECK (status IN ('pending','delivered'))`, default `'pending'` |
 | `date` | date NOT NULL | default `CURRENT_DATE` |
 | `created_at` | timestamptz | default `now()` |

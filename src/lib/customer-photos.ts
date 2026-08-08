@@ -1,17 +1,24 @@
 import { supabase } from './supabase'
 import { PHOTO_MIME_TYPE } from './image'
+import type { PhotoSlot } from './offline-db'
 
 /**
- * Private bucket holding one photo per customer.
- * Objects live at {store_id}/{customer_id}.jpg — storage RLS grants access by
- * matching the first path segment against the caller's stores.
+ * Private bucket holding the front and back photo of a customer's device.
+ * Objects live at {store_id}/{customer_id}.jpg (front) and
+ * {store_id}/{customer_id}-back.jpg — storage RLS grants access by matching
+ * the first path segment against the caller's stores.
  */
 export const CUSTOMER_PHOTOS_BUCKET = 'customer-photos'
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60
 
-export function customerPhotoPath(storeId: string, customerId: string): string {
-  return `${storeId}/${customerId}.jpg`
+export function customerPhotoPath(
+  storeId: string,
+  customerId: string,
+  slot: PhotoSlot = 'front'
+): string {
+  const suffix = slot === 'front' ? '' : `-${slot}`
+  return `${storeId}/${customerId}${suffix}.jpg`
 }
 
 /**
@@ -21,9 +28,10 @@ export function customerPhotoPath(storeId: string, customerId: string): string {
 export async function uploadCustomerPhoto(
   storeId: string,
   customerId: string,
-  blob: Blob
+  blob: Blob,
+  slot: PhotoSlot = 'front'
 ): Promise<string> {
-  const path = customerPhotoPath(storeId, customerId)
+  const path = customerPhotoPath(storeId, customerId, slot)
 
   const { error } = await supabase.storage
     .from(CUSTOMER_PHOTOS_BUCKET)

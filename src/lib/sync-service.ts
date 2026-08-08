@@ -12,6 +12,7 @@ import {
   getLocalPhoto,
   deleteLocalPhoto,
   markPhotoUploaded,
+  PHOTO_SLOTS,
   getSyncQueueCount,
   getLocalTransactions,
   saveLocalTransactions,
@@ -148,21 +149,31 @@ const adapters: Record<SyncTable, SyncTableAdapter> = {
       const { error } = await supabase.from('customers').delete().eq('id', id)
       return { error }
     },
-    // A customer photo taken offline lives in IndexedDB until this runs
+    // Customer photos taken offline live in IndexedDB until this runs
     prepareWrite: async (data, storeId) => {
       const id = data.id as string | undefined
       if (!id) return data
 
-      const photo = await getLocalPhoto(id)
-      if (!photo || photo.uploaded) return data
+      let payload = data
 
-      const path = await uploadCustomerPhoto(storeId, id, photo.blob)
-      await markPhotoUploaded(id)
+      for (const slot of PHOTO_SLOTS) {
+        const photo = await getLocalPhoto(id, slot)
+        if (!photo || photo.uploaded) continue
 
-      return { ...data, photo_path: path }
+        const path = await uploadCustomerPhoto(storeId, id, photo.blob, slot)
+        await markPhotoUploaded(id, slot)
+        payload = {
+          ...payload,
+          [slot === 'front' ? 'photo_path' : 'photo_back_path']: path,
+        }
+      }
+
+      return payload
     },
     onDeleted: async (id, storeId) => {
-      await deleteCustomerPhoto(customerPhotoPath(storeId, id))
+      for (const slot of PHOTO_SLOTS) {
+        await deleteCustomerPhoto(customerPhotoPath(storeId, id, slot))
+      }
       await deleteLocalPhoto(id)
     },
   },

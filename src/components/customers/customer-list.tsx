@@ -69,7 +69,8 @@ function CustomerRow({
   onDelete,
   onToggleStatus,
 }: CustomerRowProps) {
-  const photoUrl = useCustomerPhotoUrl(customer)
+  const photoUrl = useCustomerPhotoUrl(customer, 'front')
+  const backPhotoUrl = useCustomerPhotoUrl(customer, 'back')
   const isDelivered = customer.status === 'delivered'
 
   return (
@@ -171,13 +172,35 @@ function CustomerRow({
 
       {isExpanded && (
         <div className="mt-4 space-y-2 border-t pt-4">
-          {photoUrl && (
-            <img
-              src={photoUrl}
-              alt={customer.customer_name}
-              className="mb-3 max-h-64 w-full rounded-md object-contain"
-            />
+          {(photoUrl || backPhotoUrl) && (
+            <div className="mb-3 grid gap-2 sm:grid-cols-2">
+              {photoUrl && (
+                <figure>
+                  <img
+                    src={photoUrl}
+                    alt={`${customer.customer_name} — front`}
+                    className="max-h-64 w-full rounded-md object-contain"
+                  />
+                  <figcaption className="mt-1 text-center text-xs text-muted-foreground">
+                    Front
+                  </figcaption>
+                </figure>
+              )}
+              {backPhotoUrl && (
+                <figure>
+                  <img
+                    src={backPhotoUrl}
+                    alt={`${customer.customer_name} — back`}
+                    className="max-h-64 w-full rounded-md object-contain"
+                  />
+                  <figcaption className="mt-1 text-center text-xs text-muted-foreground">
+                    Back
+                  </figcaption>
+                </figure>
+              )}
+            </div>
           )}
+          <DetailRow label="Model" value={customer.model} />
           <DetailRow label={customer.imei2 ? 'IMEI 1' : 'IMEI'} value={customer.imei} />
           <DetailRow label="IMEI 2" value={customer.imei2} />
           <DetailRow label="Phone" value={customer.phone} />
@@ -217,6 +240,7 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
         work_name: customer.work_name,
         imei: customer.imei,
         imei2: customer.imei2,
+        model: customer.model,
         phone: customer.phone,
         cnic: customer.cnic,
         address: customer.address,
