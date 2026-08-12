@@ -181,9 +181,32 @@ export async function getDB(): Promise<IDBPDatabase<OfflineDBSchema>> {
         db.createObjectStore('metadata', { keyPath: 'key' })
       }
     },
+    // Another context (an old tab, or the previous app version) is holding the
+    // database open at an older version. Without these handlers the open call
+    // never settles, which freezes every read and write behind it.
+    blocked() {
+      console.warn('Offline DB upgrade is blocked by another open tab')
+    },
+    blocking() {
+      // We are the old connection: step aside so the newer one can upgrade
+      dbInstance?.close()
+      dbInstance = null
+    },
+    terminated() {
+      dbInstance = null
+    },
   })
 
   return dbInstance
+}
+
+/**
+ * Warm the local cache without making the caller wait. Used after a write the
+ * server already accepted: the row is safe, and the next read refills the cache
+ * anyway, so a slow or failing IndexedDB must not stall the UI.
+ */
+export function cacheLocally(write: Promise<unknown>): void {
+  write.catch((error) => console.error('Local cache write failed:', error))
 }
 
 // =====================

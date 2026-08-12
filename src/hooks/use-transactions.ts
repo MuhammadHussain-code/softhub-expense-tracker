@@ -10,6 +10,7 @@ import {
   addToSyncQueue,
   generateLocalId,
   toLocalTransaction,
+  cacheLocally,
   type LocalTransaction,
 } from '@/lib/offline-db'
 import { syncService } from '@/lib/sync-service'
@@ -220,9 +221,8 @@ export function useCreateTransaction() {
 
         if (error) throw error
 
-        // Save to local storage
-        const localTransaction = toLocalTransaction(transaction as Transaction, 'synced')
-        await saveLocalTransaction(localTransaction)
+        // Warm the local cache, but do not make the user wait for it
+        cacheLocally(saveLocalTransaction(toLocalTransaction(transaction as Transaction, 'synced')))
 
         return transaction
       }
@@ -291,9 +291,7 @@ export function useUpdateTransaction() {
 
         if (error) throw error
 
-        // Update local storage
-        const localTransaction = toLocalTransaction(transaction as Transaction, 'synced')
-        await saveLocalTransaction(localTransaction)
+        cacheLocally(saveLocalTransaction(toLocalTransaction(transaction as Transaction, 'synced')))
 
         return transaction
       }

@@ -15,6 +15,7 @@ import {
   markPhotoUploaded,
   addToSyncQueue,
   toLocalCustomer,
+  cacheLocally,
   PHOTO_SLOTS,
   type LocalCustomer,
   type PhotoSlot,
@@ -207,7 +208,7 @@ export function useCreateCustomer() {
 
         if (error) throw error
 
-        await saveLocalCustomer(toLocalCustomer(customer as Customer, 'synced'))
+        cacheLocally(saveLocalCustomer(toLocalCustomer(customer as Customer, 'synced')))
 
         if (hasPendingUpload) {
           await addToSyncQueue({
@@ -312,7 +313,7 @@ export function useUpdateCustomer() {
 
         if (error) throw error
 
-        await saveLocalCustomer(toLocalCustomer(customer as Customer, 'synced'))
+        cacheLocally(saveLocalCustomer(toLocalCustomer(customer as Customer, 'synced')))
 
         if (photoPendingUpload) {
           await addToSyncQueue({
